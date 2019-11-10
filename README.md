@@ -15,6 +15,7 @@ Unit Tests - тесты определяющие корректность ход
 
 Собрать приложение
 Backgammon\backgammon> stack build --fast --file-watch
+<br>
 Запустить приложение <br>
 Backgammon\backgammon> stack exec backgammon-exe
 
