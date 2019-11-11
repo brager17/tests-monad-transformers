@@ -36,6 +36,8 @@ dependencies:
 - warp
 - directory
 - text
+- transformers
+- utf8-string
 
 library:
   source-dirs: src

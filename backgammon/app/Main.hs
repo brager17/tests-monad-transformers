@@ -8,63 +8,58 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE KindSignatures #-}
-
 {-# LANGUAGE PolyKinds          #-}
 {-# OPTIONS_HADDOCK not-home    #-}
-
 module Main where
-
-import Prelude ()
-import Prelude.Compat
-
 import Control.Monad.Except
 import Control.Monad.Reader
+import Control.Monad.State
+import Control.Monad.Identity
+import Control.Monad.Trans.Maybe
 import Data.Aeson
-import Data.Aeson.Types
-import Data.Attoparsec.ByteString
-import Data.ByteString (ByteString)
-import Data.List
-import Data.Maybe
-import Data.String.Conversions
-import Data.Time.Calendar
 import GHC.Generics
-import Network.HTTP.Media ((//), (/:))
-import Network.Wai
-import Network.Wai.Handler.Warp
-import Servant
-import System.Directory
-import Servant.Types.SourceT (source)
+import qualified Data.ByteString.Lazy as B
+data DivByError = ErrorDiv String
+  deriving(Show)
+main = putStr ""
 
-type UserAPI1 = "users" :> Get '[JSON] [User]
+myLift :: (Monad m) => m a ->  m (Maybe a)
+myLift m = liftM Just m
+
+run = runStateT test ""
+
+myState :: StateT String Identity Int
+myState = return 1
+
+st :: State String Int
+st = state (\s -> (1,s))
+
+test :: StateT String Identity (Maybe Int)
+test = do 
+  x <- myLift myState
+  return x
 
 data User = User {
-  name :: String,
-  age :: Int,
-  email :: String
-} deriving (Eq, Show, Generic)
-instance ToJSON User
+  id :: Int,
+  name :: String
+} deriving (Generic,Show)
 
-users1 :: [User]
-users1 =
-  [ User "Isaac Newton"    372 "isaac@newton.co.uk" 
-  , User "Albert Einstein" 136 "ae@mc2.org"         
-  ]
+instance FromJSON User
 
-server1 :: Server UserAPI1
-server1 = return users1
+myRead :: IO B.ByteString
+myRead = B.readFile "users.json" 
 
-userAPI :: Proxy UserAPI1
-userAPI = Proxy
+getU :: MaybeT IO [User] =
+    do
+    x <- lift myRead
+    users <-  MaybeT $ return $ decode x
+    return users
 
--- 'serve' comes from servant and hands you a WAI Application,
--- which you can think of as an "abstract" web application,
--- not yet a webserver.
-app1 :: Application
-app1 = serve userAPI server1
+tes :: MaybeT IO [User]
+tes = do
+  x <- lift myRead
+  users <- getU
+  return users
 
-main :: IO ()
-main = run 8081 app1
-
-
-data (path :: k) ++ (a :: *)
-
+decodeTest :: Maybe User
+decodeTest = decode "{\"name\":\"Isaac Newton\",\"id\":1}" 
