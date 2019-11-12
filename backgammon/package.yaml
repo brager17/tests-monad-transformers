@@ -38,7 +38,7 @@ dependencies:
 - text
 - transformers
 - utf8-string
-
+- either
 library:
   source-dirs: src
 

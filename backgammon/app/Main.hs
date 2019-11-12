@@ -16,50 +16,63 @@ import Control.Monad.Reader
 import Control.Monad.State
 import Control.Monad.Identity
 import Control.Monad.Trans.Maybe
-import Data.Aeson
+import Control.Monad.Trans
 import GHC.Generics
+import Control.Monad.Trans
 import qualified Data.ByteString.Lazy as B
 data DivByError = ErrorDiv String
   deriving(Show)
 main = putStr ""
 
-myLift :: (Monad m) => m a ->  m (Maybe a)
-myLift m = liftM Just m
+type Position = Int
+type Dice = (Int,Int)
 
-run = runStateT test ""
+data ChipState = 
+    Open Position 
+  | Close Position 
+  | KnockedOut
 
-myState :: StateT String Identity Int
-myState = return 1
+data Player = White | Black
+type Winner = Player
 
-st :: State String Int
-st = state (\s -> (1,s))
+data Action = 
+    Dice1
+  | Move GameState
 
-test :: StateT String Identity (Maybe Int)
-test = do 
-  x <- myLift myState
-  return x
+data WaitUserActionT = 
+    BlackPlayerAction Action
+  | WhitePlayerAction Action
 
-data User = User {
-  id :: Int,
-  name :: String
-} deriving (Generic,Show)
+data GameState = 
+    Start 
+  | End Winner
+  | WaitUserAction WaitUserActionT
 
-instance FromJSON User
+instance Show GameState where
+  show Start = "start"
+  show (End winner) = "end"
+  show (WaitUserAction _) = "WaitUserAction"
 
-myRead :: IO B.ByteString
-myRead = B.readFile "users.json" 
+data BoardState = BoardState 
+                          {  blackPlayer :: [ChipState]
+                           , whitePlayer :: [ChipState]
+                           , dice :: Dice
+                           }
 
-getU :: MaybeT IO [User] =
-    do
-    x <- lift myRead
-    users <-  MaybeT $ return $ decode x
-    return users
 
-tes :: MaybeT IO [User]
-tes = do
-  x <- lift myRead
-  users <- getU
-  return users
+startGame :: Reader GameState (Either String GameState)
+startGame = reader (\x -> Right $ WaitUserAction $ WhitePlayerAction Dice1)
 
-decodeTest :: Maybe User
-decodeTest = decode "{\"name\":\"Isaac Newton\",\"id\":1}" 
+
+move :: Player -> Position -> ExceptT String (Reader GameState) GameState
+move pl po = do
+    st <- lift ask
+    guard (case (pl,st) of (White, (WaitUserAction (BlackPlayerAction _))) -> False
+                           (Black, (WaitUserAction (WhitePlayerAction _))) -> False
+                           _ -> True)
+    return Start
+
+testPlayerAction = WaitUserAction $ WhitePlayerAction Dice1
+
+testMove = runIdentity $ runReaderT (runExceptT $ move Black 1) Start
+
