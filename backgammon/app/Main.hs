@@ -113,6 +113,3 @@ testPlayerAction = WaitUserAction $ WhitePlayerAction Dice1
 run m = runIdentity $ runReaderT (runExceptT m) (WaitUserAction (BlackPlayerAction Dice1))
 
 run1 = runExceptT 
-
-p :: Position
-p = 1
