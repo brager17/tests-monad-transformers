@@ -27,6 +27,11 @@ main = putStr ""
 type Position = Int
 type Dice = (Int,Int)
 
+
+data Chip = Chip{
+  id :: Int,
+  state :: ChipState
+}
 data ChipState = 
     Open Position 
   | Close Position 
@@ -37,7 +42,7 @@ type Winner = Player
 
 data Action = 
     Dice1
-  | Move GameState
+  | Move BoardState
 
 data WaitUserActionT = 
     BlackPlayerAction Action
@@ -54,8 +59,8 @@ instance Show GameState where
   show (WaitUserAction _) = "WaitUserAction"
 
 data BoardState = BoardState 
-                          {  blackPlayer :: [ChipState]
-                           , whitePlayer :: [ChipState]
+                          {  blackPlayer :: [Chip]
+                           , whitePlayer :: [Chip]
                            , dice :: Dice
                            }
 
@@ -64,15 +69,50 @@ startGame :: Reader GameState (Either String GameState)
 startGame = reader (\x -> Right $ WaitUserAction $ WhitePlayerAction Dice1)
 
 
-move :: Player -> Position -> ExceptT String (Reader GameState) GameState
-move pl po = do
+playerGuard :: Player ->  ExceptT String (Reader GameState) GameState
+playerGuard pl = do
     st <- lift ask
-    guard (case (pl,st) of (White, (WaitUserAction (BlackPlayerAction _))) -> False
-                           (Black, (WaitUserAction (WhitePlayerAction _))) -> False
-                           _ -> True)
-    return Start
+    case (pl,st) of (White, (WaitUserAction (BlackPlayerAction _))) -> throwError  "now is not your turn"
+                    (Black, (WaitUserAction (WhitePlayerAction _))) -> throwError "now is not your turn"
+                    _ -> return st
+
+gameIsActiveGuard :: ExceptT String (Reader GameState) GameState
+gameIsActiveGuard = do
+  state <- lift ask
+  case state of Start -> throwError "need start game"
+                End _ ->  throwError "need end game"
+                _ -> return state
+
+waitMoveGuard :: ExceptT String (Reader GameState) BoardState
+waitMoveGuard = do
+  state <- lift ask
+  case state of WaitUserAction (BlackPlayerAction(Move board)) -> return board
+                WaitUserAction (WhitePlayerAction(Move board)) -> return board
+                _ -> throwError "is not move"
+
+
+move :: Player -> Int -> Position -> ExceptT String (Reader GameState) GameState
+move pl chipId newPosition = 
+  do
+    playerGuard pl
+    gameIsActiveGuard
+    board <- waitMoveGuard
+    case pl of Black -> 
+                      let 
+                        id :: Chip -> Int
+                        id  x = id x
+                        chip = head $ filter (\x -> (id x) == chipId) $ blackPlayer board
+                        otherChips = filter (\x -> (id x) /= chipId) $ blackPlayer board
+                      in return (WaitUserAction (WhitePlayerAction $ Move (board {blackPlayer = chip:otherChips})))
+               _ -> return Start
 
 testPlayerAction = WaitUserAction $ WhitePlayerAction Dice1
 
-testMove = runIdentity $ runReaderT (runExceptT $ move Black 1) Start
+-- testMove = runIdentity $ runReaderT (runExceptT $ move Black 1) Start
 
+run m = runIdentity $ runReaderT (runExceptT m) (WaitUserAction (BlackPlayerAction Dice1))
+
+run1 = runExceptT 
+
+p :: Position
+p = 1
